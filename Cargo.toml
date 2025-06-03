@@ -1,0 +1,15 @@
+[package]
+name = "bevy_zombie_test"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bevy = "0.15.3"
+bevy_life = {version = "0.11.0", features = ["auto-coloring"]}
+noise = "0.9.0"
+rand = "0.9.1"
+
+[features]
+default = ["2D", "auto-coloring"]
+2D = []
+auto-coloring = ["bevy/bevy_sprite", "bevy/bevy_color"]
