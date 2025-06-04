@@ -1,11 +1,10 @@
-#[cfg(feature = "auto-coloring")]
-use bevy::prelude::{warn, Color};
+use bevy::prelude::warn;
 use bevy::{audio::CpalSample, math::IVec2, prelude::Component};
 use bevy_life::CellState;
 use std::cmp::Ordering;
 
 #[derive(Debug, Clone, Default, Eq, PartialEq, Component)]
-enum Status {
+pub enum Status {
     #[default]
     Empty,
     Zombie,
@@ -31,14 +30,14 @@ impl Status {
 
 #[derive(Debug, Clone, Default, Eq, PartialEq, Component)]
 pub struct ZombieState {
-    xy: IVec2,        // (immutable, from terrain generation)
-    altitude: i32,    // (immutable, from terrain generation)
-    temperature: i32, // (immutable, from terrain generation)
-    status: Status,
-    population: i32,
-    direction: i8, // (Where they will either attack or reinforce on the next turn) (range 0-7), use own coordinate and neighbor coordinate to determine if incoming
-    smell_human: i32, // Human smell (0-100, 0 means no smell, 100 means very strong smell)
-    smell_zombie: i32, // Zombie smell (0-100, 0 means no smell, 100 means very strong smell)
+    pub xy: IVec2,        // (immutable, from terrain generation)
+    pub altitude: i32,    // (immutable, from terrain generation)
+    pub temperature: i32, // (immutable, from terrain generation)
+    pub status: Status,
+    pub population: i32,
+    pub direction: i8, // (Where they will either attack or reinforce on the next turn) (range 0-7), use own coordinate and neighbor coordinate to determine if incoming
+    pub smell_human: i32, // Human smell (0-100, 0 means no smell, 100 means very strong smell)
+    pub smell_zombie: i32, // Zombie smell (0-100, 0 means no smell, 100 means very strong smell)
 }
 
 impl CellState for ZombieState {
@@ -236,15 +235,6 @@ impl CellState for ZombieState {
         // println!("new_state: {new_state:?}");
 
         new_state
-    }
-
-    #[cfg(feature = "auto-coloring")]
-    fn color(&self) -> Option<bevy::prelude::Color> {
-        match self.status {
-            Status::Empty => Some(Color::BLACK),
-            Status::Zombie => Some(Color::srgba(0., 1., 0., 1.)), // Zombie Green
-            Status::Human => Some(Color::srgba(0., 0., 1., 1.)),  // Human Blue
-        }
     }
 }
 
