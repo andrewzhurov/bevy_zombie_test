@@ -12,7 +12,7 @@ use crate::zombie_state::ZombieState;
 #[cfg(feature = "2D")]
 pub type ZombiePlugin = CellularAutomatonPlugin<MooreCell2d, ZombieState>;
 
-const scale:i32 = 100;
+const SCALE: i32 = 100;
 
 fn main() {
     App::new()
@@ -24,7 +24,10 @@ fn main() {
             }),
             ..default()
         }))
-        .add_plugins(ZombiePlugin::default())
+        .add_plugins(ZombiePlugin {
+            // tick_time_step: Some(0.1),
+            ..default()
+        })
         .insert_resource(SimulationBatch)
         .add_systems(Startup, (setup_camera, setup_map))
         .run();
@@ -39,7 +42,7 @@ fn setup_map(mut commands: Commands) {
 }
 
 fn spawn_map(commands: &mut Commands) {
-    let (size_x, size_y) = (3 * scale as usize, 2 * scale as usize);
+    let (size_x, size_y) = (3 * SCALE as usize, 2 * SCALE as usize);
     let sprite_size = 2.;
     let terrain = terrain::TerrainGenerator::new(42).generate(size_x, size_y, 5, 100.0);
     let color = Color::srgba(0., 0., 0., 0.);
@@ -78,7 +81,7 @@ fn spawn_map(commands: &mut Commands) {
                     } else {
                         0 // Empty cells have no population
                     };
-                    let state = zombie_state::ZombieState(gen_at_location);
+                    let state = zombie_state::ZombieState::from(gen_at_location);
                     builder.spawn((
                         Sprite {
                             custom_size: Some(Vec2::splat(sprite_size)),
