@@ -189,37 +189,57 @@ impl CellState for ZombieState {
         // If we're humans, hunker down unless we detect a zombie population significantly smaller than ours.
         match new_state.status {
             Status::Zombie => {
-                let mut max_smell = 0;
-                for neighbor in &neighbors {
-                    if neighbor.smell_human > max_smell {
-                        max_smell = neighbor.smell_human;
-                        new_state.direction = delta_to_direction(neighbor.xy - self.xy).unwrap();
-                        // Take the direction of the strongest human smell
-                    }
-                }
-            }
-            Status::Human => {
-                let min_zsmell_neighbor = neighbors
+                let preferred_neighbor = neighbors
                     .iter()
-                    .min_by(|n1, n2| n1.smell_zombie.cmp(&n2.smell_zombie))
+                    .max_by(|n1, n2| {
+                        match n1.smell_human.cmp(&n2.smell_human) {
+                            Ordering::Equal => {
+                                match n1.temperature.cmp(&n2.temperature) {
+                                    Ordering::Equal => {
+                                        n1.altitude.cmp(&n2.altitude).reverse() // zombies prefer lower places
+                                    }
+                                    non_eq => non_eq.reverse(), // zombies preffer cold places
+                                }
+                            }
+                            non_eq => non_eq,
+                        }
+                    })
                     .unwrap();
 
-                let min_zsmell_neighbor_zombie_population =
-                    if min_zsmell_neighbor.status.is_zombie() {
-                        min_zsmell_neighbor.population
-                    } else {
-                        0
-                    };
+                new_state.direction = delta_to_direction(preferred_neighbor.xy - self.xy).unwrap();
+            }
+            Status::Human => {
+                let preferred_neighbor = neighbors
+                    .iter()
+                    .max_by(|n1, n2| match n1.smell_zombie.cmp(&n2.smell_zombie) {
+                        Ordering::Equal => {
+                            match n1.temperature.cmp(&n2.temperature) {
+                                Ordering::Equal => {
+                                    n1.altitude.cmp(&n2.altitude) // people prefer higher places, it's a zombie apoc, high is safer!
+                                }
+                                non_eq => non_eq, // people prefer warmer places
+                            }
+                        }
+                        non_eq => non_eq.reverse(), // people prefer places with less zombie smell, this is ImPoRtAnT! (for living to see another day)
+                    })
+                    .unwrap();
+
+                let preferred_neighbor_zombie_population = if preferred_neighbor.status.is_zombie()
+                {
+                    preferred_neighbor.population
+                } else {
+                    0
+                };
 
                 // Move to min zombie smell cell if either
                 // We outnumber zombies > 3:1 - attack!
                 // It has smaller than ours zombie smell - it's probably a safer cell than ours.
-                if (new_state.population / 3 > min_zsmell_neighbor_zombie_population)
-                    || (!min_zsmell_neighbor.status.is_zombie()
-                        && min_zsmell_neighbor.smell_zombie < new_state.smell_zombie)
+                if (new_state.population / 3 > preferred_neighbor_zombie_population)
+                    || (!preferred_neighbor.status.is_zombie()
+                        && preferred_neighbor.smell_zombie < new_state.smell_zombie)
                 {
                     new_state.direction =
-                        delta_to_direction(min_zsmell_neighbor.xy - self.xy).unwrap();
+                        delta_to_direction(preferred_neighbor.xy - self.xy).unwrap();
                 }
             }
             _ => {}
