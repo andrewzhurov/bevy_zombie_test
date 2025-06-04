@@ -12,6 +12,8 @@ use crate::zombie_state::ZombieState;
 #[cfg(feature = "2D")]
 pub type ZombiePlugin = CellularAutomatonPlugin<MooreCell2d, ZombieState>;
 
+const scale:i32 = 100;
+
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
@@ -37,7 +39,7 @@ fn setup_map(mut commands: Commands) {
 }
 
 fn spawn_map(commands: &mut Commands) {
-    let (size_x, size_y) = (150, 100);
+    let (size_x, size_y) = (3 * scale as usize, 2 * scale as usize);
     let sprite_size = 2.;
     let terrain = terrain::TerrainGenerator::new(42).generate(size_x, size_y, 5, 100.0);
     let color = Color::srgba(0., 0., 0., 0.);

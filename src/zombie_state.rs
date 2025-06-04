@@ -53,7 +53,7 @@ impl CellState for ZombieState {
         // Apply attack or reinforce from neighbors first, then update population, finally update intentions
         let neighbors: Vec<&Self> = neighbor_cells.collect();
 
-        // First, look at the Direction value of all neighbors to see if any are sending zombies/humans our way.
+        // Next, look at the Direction value of all neighbors to see if any are sending zombies/humans our way.
         let mut incoming_humans = 0;
         let mut incoming_zombies = 0;
         for neighbor in &neighbors {
@@ -75,8 +75,8 @@ impl CellState for ZombieState {
 
         // Now, update our own state based on incoming zombies and humans
         // Count how many zombies and humans we have (including ourselves). Give advantage to whichever holds this cell.
-        let total_humans = incoming_humans + if self.0[4] == 2 { self.0[5] } else { 0 };
-        let total_zombies = incoming_zombies + if self.0[4] == 1 { self.0[5] } else { 0 };
+        let total_humans = incoming_humans + if self.0[4] == 2 && self.0[6] != 8 { self.0[5] } else { 0 }; // Our own population only counts if they didn't move away on the last turn!
+        let total_zombies = incoming_zombies + if self.0[4] == 1 && self.0[6] != 8 { self.0[5] } else { 0 };
         // Defender's advantage: offense must be 3x defender's population to take the cell
         let mut new_state = self.0.clone();
         if self.0[4] == 0 {
@@ -93,20 +93,24 @@ impl CellState for ZombieState {
             }
         } else if self.0[4] == 1 {
             // If zombie, check if we can hold the cell
-            if total_zombies >= total_humans * 3 {
-                new_state[5] += incoming_zombies; // Add incoming zombies to our population
-            } else {
+            if total_zombies < total_humans {
                 new_state[4] = 2; // Cell goes to humans
                 new_state[5] = total_humans - total_zombies; // New population
-            }
-        } else if self.0[4] == 2 {
-            // If human, check if we can hold the cell
-            if total_humans >= total_zombies * 3 {
-                new_state[5] += incoming_humans; // Add incoming humans to our population
             } else {
-                new_state[4] = 1; // Cell goes to zombies
                 new_state[5] = total_zombies - total_humans; // New population
             }
+            new_state[5] += total_humans / 3; // Add 1/3 of humans to zombies to simulate the zombie infection spread
+            //println!("Added {} zombies to cell at ({}, {})", total_humans / 3, self.0[0], self.0[1]);
+        } else if self.0[4] == 2 {
+            // If human, check if we can hold the cell
+            if total_humans < total_zombies / 3 {// 
+                new_state[4] = 1; // Cell goes to zombies
+                new_state[5] = total_zombies / 3 - total_humans; // New population
+            } else {
+                new_state[5] = total_humans - total_zombies / 3; // New population
+            }
+            new_state[5] += total_humans / 10; // Add 1/10 of humans to humans to simulate human reproduction
+            //println!("Added {} humans to cell at ({}, {})", total_humans / 10, self.0[0], self.0[1]);
         }
         // Update smell and noise. Set to average of neighbors, then add 1 for each population (human or zombie) in the cell.
         new_state[7] = neighbors.iter()
@@ -129,26 +133,38 @@ impl CellState for ZombieState {
                 }
             }
         } else if new_state[4] == 2 { // Human
-            let mut max_smell = 0;
+            let mut min_smell = 0;
             let mut zombie_population = 0;
+            let mut neighbor_state = 0;
             for neighbor in &neighbors {
-                if neighbor.0[8] > max_smell {
-                    max_smell = neighbor.0[8];
-                    direction = neighbor.0[6]; // Take the direction of the strongest zombie smell
-                    zombie_population = if neighbor.0[4] == 1 {neighbor.0[5]} else {0}; // Get the population of the strongest zombie smell
+                if neighbor.0[8] < min_smell {
+                    min_smell = neighbor.0[8];
+                    direction = neighbor.0[6]; // Take the direction of the smallest zombie smell
+                    zombie_population = if neighbor.0[4] == 1 {neighbor.0[5]} else {0}; // Get the population of the smallest zombie smell
+                    neighbor_state = neighbor.0[4]; // Get the state of the neighbor
                 }
             }
-            // Check if strongest zombie smell is from a zombie smell, if so check population. If population is less than 1/3 of ours, attack.
-            // If not a zombie cell, just hunker down.
+            // Check if smallest zombie smell is from a zombie cell, if so check population. If population is less than 1/3 of ours, attack.
+            // If not a zombie cell, check if zombie smell is less than own cell - if so it's probably a safer cell
             if direction != 8 && new_state[5] > 0 && zombie_population < new_state[5] / 3 {
                 // If we have a strong enough population, attack
                 direction = delta_to_direction(DIRECTION_DELTAS[direction as usize]).unwrap_or(8);
-            } else {
-                // Otherwise, hunker down
-                direction = 8; // No direction
+            } else if direction != 8 && new_state[5] > 0 && neighbor_state != 1 && min_smell < new_state[8] {
+                // If the smallest zombie smell is not from a zombie cell, and the smell is less than our own, it's probably a safer cell than ours, the population should move there.
+                direction = delta_to_direction(DIRECTION_DELTAS[direction as usize]).unwrap_or(8);
             }
         }
         new_state[6] = direction; // Update our direction based on smells
+
+        // Check if population is zero, if so set state to empty and direction to no direction (8)
+        if new_state[5] <= 0 {
+            new_state[4] = 0; // Set to empty
+            new_state[6] = 8; // No direction
+        }
+
+        if self.0[4] != new_state[4] {
+            //println!("Cell at ({}, {}) changed from {:?} to {:?}", self.0[0], self.0[1], self.0[4], new_state[4]);
+        }
 
         Self(new_state)
     }
